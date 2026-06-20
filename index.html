@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KOL MailFlow</title>
+    <meta
+      name="description"
+      content="KOL MailFlow helps influencer operations teams draft warm outreach, negotiation, contract, and follow-up emails from pasted email context."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="brand-title">KOL <span>MailFlow</span></div>
+          <div class="brand-sub">红人运营邮件工作台</div>
+        </div>
+        <div class="flow">筛选 → 邀约 → 报价 → 砍价 → 寄样 → 催稿</div>
+      </header>
+
+      <section class="layout">
+        <section class="panel input-panel">
+          <div class="panel-title"><span>1</span>粘贴邮件上下文</div>
+          <textarea
+            id="rawEmail"
+            class="raw-email"
+            placeholder="把你发出的 AI 邀约、合作内容、问题，以及红人的回复一起粘贴进来。工具会从整段上下文里理解产品、合作内容、报价和对方回复。"
+          ></textarea>
+
+          <div class="panel-title with-space"><span>2</span>选择邮件场景</div>
+          <div id="scenarioCards" class="scenario-grid"></div>
+
+          <div id="dynamicFields" class="dynamic-fields"></div>
+
+          <div class="panel-title with-space"><span>3</span>自动提取，可手动修正</div>
+          <div class="mini-grid">
+            <label class="field">
+              <span>红人名字</span>
+              <input id="creatorName" type="text" placeholder="自动识别" />
+            </label>
+            <label class="field">
+              <span>我的署名</span>
+              <input id="senderName" type="text" placeholder="自动识别最近一封我方邮件" />
+            </label>
+            <label class="field">
+              <span>平台</span>
+              <input id="platformOverride" type="text" placeholder="自动识别" />
+            </label>
+            <label class="field">
+              <span>红人报价</span>
+              <input id="quotedPrice" type="text" placeholder="自动识别" />
+            </label>
+            <label class="field">
+              <span>合作内容</span>
+              <input id="deliverables" type="text" placeholder="自动识别" />
+            </label>
+            <label class="field">
+              <span>样品/产品</span>
+              <input id="productName" type="text" placeholder="自动识别，可手改" />
+            </label>
+          </div>
+
+          <label class="field full">
+            <span>人工补充要求</span>
+            <textarea
+              id="customNotes"
+              rows="3"
+              placeholder="例如：不要太强硬；强调客户这周要确认；需要 Reels + Story；用更亲切的语气"
+            ></textarea>
+          </label>
+
+          <div class="actions">
+            <button id="generateBtn" class="primary" type="button">生成邮件 →</button>
+            <button id="sampleBtn" type="button">示例</button>
+            <button id="clearBtn" type="button">清空</button>
+          </div>
+          <div id="statusText" class="status">等待输入</div>
+        </section>
+
+        <aside class="panel preview-panel">
+          <div class="preview-head">
+            <div class="panel-title no-margin"><span>✓</span>邮件预览</div>
+            <button id="copyBtn" class="copy-btn" type="button">复制全文</button>
+          </div>
+
+          <div id="subjectLine" class="subject-line is-hidden">
+            <b>Subject:</b> <span id="subjectText"></span>
+          </div>
+          <div id="outputBox" class="output-box empty">左侧填好信息后，点击「生成邮件」</div>
+
+          <div class="extracted">
+            <div class="extracted-title">当前识别结果</div>
+            <div id="tagRow" class="tag-row"></div>
+          </div>
+        </aside>
+      </section>
+    </main>
+
+    <script src="./app.js?v=21"></script>
+  </body>
+</html>
