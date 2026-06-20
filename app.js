@@ -262,7 +262,7 @@ function splitThreadBlocks(text) {
 }
 
 function extractHeaderValue(block, label) {
-  const pattern = new RegExp(`(?:^|\\n)\\s*(?:${label})\\s*[:：]\\s*([^\\n]+)`, "i");
+  const pattern = new RegExp(`(?:^|\\n)\\s*(?:${label})\\s*[:：]\\s*(?:\\n\\s*)?([^\\n]+)`, "i");
   const match = block.match(pattern);
   return match ? match[1].trim() : "";
 }
@@ -276,7 +276,7 @@ function extractPersonFromHeader(value) {
 }
 
 function isIflyAddress(value) {
-  return /@iflytalent\.cn\b/i.test(value) || /\biflytalent team\b/i.test(value);
+  return /@iflytalent\.(?:cn|world)\b/i.test(value) || /\biflytalent team\b/i.test(value);
 }
 
 function blockSender(block) {
@@ -298,7 +298,7 @@ function analyzeThread(text) {
   const ourBlocks = blocks.filter(looksLikeOurEmail);
   const creatorBlocks = blocks.filter((block) => !looksLikeOurEmail(block));
   const ourText = ourBlocks.join("\n\n");
-  const creatorReply = creatorBlocks.length ? creatorBlocks[creatorBlocks.length - 1] : blocks[blocks.length - 1];
+  const creatorReply = creatorBlocks.length ? creatorBlocks[0] : blocks[0];
   return {
     fullText: text,
     ourText,
@@ -365,15 +365,19 @@ function extractTimelinePrompt(text) {
 
 function extractName(text) {
   const sender = blockSender(text);
+  let senderFallback = "";
   if (sender && !isIflyAddress(sender)) {
     const candidate = extractPersonFromHeader(sender);
-    if (candidate) return candidate;
+    const visibleName = sender.split(/[<（(]/)[0].trim();
+    const isBareEmail = /^[^\s<>（(]+@[^\s<>）)]+$/.test(sender.trim()) || visibleName.includes("@");
+    if (candidate && !isBareEmail) return candidate;
+    if (candidate) senderFallback = titleCase(candidate.replace(/[._-]/g, " "));
   }
 
   const lines = text.split("\n").map((line) => line.trim()).filter(Boolean);
   const fromLine = [...lines]
     .reverse()
-    .find((line) => /^from:/i.test(line) && !/\b(?:ann|ifly|iflytalent|talent team|sybil|lily|david)\b/i.test(line));
+    .find((line) => /^from:/i.test(line) && !isIflyAddress(line));
   if (fromLine) {
     const match = fromLine.match(/^from:\s*"?([^"<@]+)"?/i);
     if (match) return titleCase(match[1].replace(/[._-]/g, " "));
@@ -392,7 +396,8 @@ function extractName(text) {
   }
 
   const intro = text.match(/\b(?:I am|I'm|This is)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/);
-  return intro ? titleCase(intro[1]) : "";
+  if (intro) return titleCase(intro[1]);
+  return senderFallback;
 }
 
 function extractPlatform(text) {
