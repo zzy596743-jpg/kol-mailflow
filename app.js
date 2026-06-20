@@ -618,28 +618,59 @@ function sentenceList(items) {
 function reasonToEnglish(reason) {
   const value = cleanText(reason);
   if (REASON_TEXT[value]) return REASON_TEXT[value];
+  if (/湿巾.*单价低|单价低|客单价低|价格低|产品价格低/i.test(value)) return "this is a lower price-point product, so the campaign budget is more limited";
+  if (/预算有限|预算不高|预算低/i.test(value)) return "the campaign budget is quite controlled for this round";
   if (value.includes("预算有限")) return "the campaign budget is quite controlled for this round";
   if (value.includes("首次合作")) return "since this would be our first collaboration, the client hopes to start with a trial budget";
   if (value.includes("长期合作")) return "if this first project goes well, we would love to explore more long-term opportunities";
   if (value.includes("样品")) return "the product sample will also be provided for you to experience and keep";
   if (value.includes("审核")) return "the client needs to review the draft before posting";
   if (value.includes("时间")) return "the campaign timeline is a bit tight";
+  if (/排他|独家|exclusiv/i.test(value)) return "the client has an exclusivity requirement for this campaign";
+  if (/单独|dedicated|单条|单支/i.test(value)) return "the client needs this to be a dedicated standalone video";
+  if (/不做插播|不要插播|不接受插播|插播/i.test(value)) return "integrated mentions or short insert-style placements would not work for this brief";
   return value;
 }
 
 function reasonSentence(reasons) {
   const translated = reasons.map(reasonToEnglish).filter(Boolean);
   if (!translated.length) return "";
+  const reasonText = sentenceList(translated);
   return pickVariant("reason-sentence", [
-    ` Just to share a little context, ${sentenceList(translated)}.`,
-    ` The main reason is that ${sentenceList(translated)}.`,
-    ` For a bit of background, ${sentenceList(translated)}.`,
-    ` I wanted to be transparent here: ${sentenceList(translated)}.`,
+    ` Just to share a little context, ${reasonText}.`,
+    ` The main reason is that ${reasonText}.`,
+    ` For a bit of background, ${reasonText}.`,
+    ` I wanted to be transparent here: ${reasonText}.`,
   ]);
 }
 
+function translateCustomNotes(notes) {
+  const text = cleanText(notes);
+  if (!text) return [];
+  const items = [];
+  if (/排他|独家|exclusiv/i.test(text)) {
+    items.push("Please also note that the client has an exclusivity requirement for this campaign.");
+  }
+  if (/单独|dedicated|单条|单支/i.test(text)) {
+    items.push("The content should be created as a dedicated standalone video.");
+  }
+  if (/不做插播|不要插播|不接受插播|不做integrated|not integrated|no integrated|插播/i.test(text)) {
+    items.push("Integrated mentions or short insert-style placements would not work for this brief.");
+  }
+  if (/不要太强硬|别太强硬|soft|gentle/i.test(text)) {
+    items.push("Please keep the tone friendly and low-pressure.");
+  }
+  if (/加急|尽快|urgent|asap/i.test(text)) {
+    items.push("The timeline is a little tight, so a quick confirmation would be very helpful.");
+  }
+  if (!items.length) items.push(text);
+  return uniqueValues(items);
+}
+
 function notesSentence(notes) {
-  return notes ? `\n\nOne small note from our side: ${notes}` : "";
+  const items = translateCustomNotes(notes);
+  if (!items.length) return "";
+  return `\n\n${items.join("\n")}`;
 }
 
 function pickVariant(key, options) {
