@@ -17,7 +17,7 @@ const SCENARIOS = {
   "ask-budget": {
     title: "回应预算",
     desc: "红人反问预算，不想暴露过多空间",
-    subject: "Re: Collaboration opportunity",
+    subject: "Re: Collaboration details",
     fields: [
       { id: "budget", label: "可透露预算 / 价格", type: "text", placeholder: "例如 $300，留空则让对方先报价" },
     ],
@@ -492,6 +492,38 @@ function platformSelectionNote(context) {
   return "\n\nThe client may choose Instagram, TikTok, or both platforms later based on your account data and campaign fit, so it would be helpful to have the rates for both options first.";
 }
 
+function subjectForScenario(scenario) {
+  const subjects = {
+    "ask-details": [
+      "Re: Collaboration details",
+      "Re: Quick details for the collaboration",
+      "Re: A few details for the campaign",
+    ],
+    "ask-budget": [
+      "Re: Collaboration details",
+      "Re: Campaign budget",
+      "Re: Package rate",
+      "Re: Budget and deliverables",
+    ],
+    "negotiate-price": [
+      "Re: Collaboration rate",
+      "Re: Rate for this campaign",
+      "Re: Campaign budget update",
+    ],
+    "contract-address": [
+      "Next steps for our collaboration",
+      "Contract and next steps",
+      "Moving forward with the collaboration",
+    ],
+    "follow-up-draft": [
+      "Quick follow-up on the draft",
+      "Checking in on the draft",
+      "Draft review follow-up",
+    ],
+  };
+  return pickVariant(`subject-${scenario}`, subjects[scenario] || [SCENARIOS[scenario].subject]);
+}
+
 function extractProduct(text) {
   const known = [
     /Momcozy\s+[A-Za-z0-9 +'-]+?(?:Wipes|Pump|Bottle|Bra|Carrier|Warmer|Monitor)/i,
@@ -597,7 +629,13 @@ function reasonToEnglish(reason) {
 
 function reasonSentence(reasons) {
   const translated = reasons.map(reasonToEnglish).filter(Boolean);
-  return translated.length ? ` Just to share a little context, ${sentenceList(translated)}.` : "";
+  if (!translated.length) return "";
+  return pickVariant("reason-sentence", [
+    ` Just to share a little context, ${sentenceList(translated)}.`,
+    ` The main reason is that ${sentenceList(translated)}.`,
+    ` For a bit of background, ${sentenceList(translated)}.`,
+    ` I wanted to be transparent here: ${sentenceList(translated)}.`,
+  ]);
 }
 
 function notesSentence(notes) {
@@ -711,30 +749,50 @@ function generateAskBudget(context) {
   const budget = fieldValue("budget");
   const budgetLine = budget
     ? pickVariant("budget-with-number", [
-        `For this one, we are hoping to keep the budget around ${budget}, depending on the final content package.`,
-        `The range we are trying to stay within is around ${budget}, though it can depend a bit on the final scope.`,
-        `At the moment, the client is hoping to keep this closer to ${budget} for the package.`,
+        `For this one, the client is trying to keep the package around ${budget}, depending on the final scope.`,
+        `The number we are working with right now is around ${budget}, though the final package still matters.`,
+        `For this campaign, we are looking at roughly ${budget} for the package.`,
+        `The client asked us to stay close to ${budget} for this round if possible.`,
+        `We are trying to make this work around ${budget}, depending on what is included.`,
+        `Right now, ${budget} is the range we can most realistically bring back to the client.`,
       ])
     : pickVariant("budget-no-number", [
         "We are still lining up the final creator list, so I do not want to give you a number that ends up being misleading.",
         "The client is still reviewing creator options, so I am collecting rates first before locking in a number.",
         "We are still matching rates with the final scope, so it would be helpful to see what package would work best for you.",
+        "We are still confirming the creator mix, so I would rather check your usual package first and then take it back to the client.",
+        "The final budget depends a bit on the package and platform, so your usual rate would really help us frame this properly.",
       ]);
   const askRate = pickVariant("budget-ask-rate", [
     `Would you be comfortable sharing what rate would work for you for ${deliverablePhrase(context)}${platformSuffix(context)}?`,
     `Could you send over the rate you would feel good about for ${deliverablePhrase(context)}${platformSuffix(context)}?`,
     `What rate would you usually quote for ${deliverablePhrase(context)}${platformSuffix(context)}?`,
+    `What number would make sense on your side for ${deliverablePhrase(context)}${platformSuffix(context)}?`,
+    `Could you let me know what package rate you would suggest for ${deliverablePhrase(context)}${platformSuffix(context)}?`,
+  ]);
+  const opener = pickVariant("budget-opener", [
+    "Thanks for asking — totally understand.",
+    "Of course, happy to share a bit more context.",
+    "Totally fair question.",
+    "Yes, absolutely — thanks for checking.",
+    "I completely understand wanting to confirm the budget first.",
+  ]);
+  const close = pickVariant("budget-close", [
+    "I can then take it back to the client and try to push this forward from there.",
+    "Once I have that, I can bring it to the client and see how close we can get.",
+    "That will help me position this properly with the client.",
+    "From there, I can check internally and come back with a clearer next step.",
   ]);
 
   return `${greeting(context.name)}
 
-Thanks for asking — totally understand.
+${opener}
 
 ${budgetLine}${reasonSentence(context.reasons)}
 
 ${askRate} If you have separate package options, that would be even better.${platformSelectionNote(context)}
 
-I can then take it back to the client and try to push this forward from there.${notesSentence(context.notes)}
+${close}${notesSentence(context.notes)}
 
 ${signature(context)}`;
 }
@@ -853,7 +911,7 @@ function generateEmail() {
     "follow-up-draft": generateFollowUpDraft,
   };
 
-  const subject = SCENARIOS[activeScenario].subject;
+  const subject = subjectForScenario(activeScenario);
   const body = generators[activeScenario](context).replace(/[ \t]+\n/g, "\n");
   const normalizedBody = body.replace(/\n{3,}/g, "\n\n");
   currentEmail = `Subject: ${subject}\n\n${normalizedBody}`;
