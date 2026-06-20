@@ -615,6 +615,28 @@ function sentenceList(items) {
   return `${clean.slice(0, -1).join(", ")} and ${clean[clean.length - 1]}`;
 }
 
+function hasChinese(text) {
+  return /[\u4e00-\u9fff]/.test(text || "");
+}
+
+function reasonFlags(reasons) {
+  const source = reasons.join(" ");
+  return {
+    lowBudget: /项目预算有限|客户预算有限|预算有限|预算不高|预算低/i.test(source),
+    scopePending: /预算需根据最终内容确认|最终内容|最终package|final scope/i.test(source),
+    firstTrial: /首次合作|先试水|trial|first collaboration/i.test(source),
+    longTerm: /长期合作|long-term|long term/i.test(source),
+    sampleIncluded: /样品|sample/i.test(source),
+    benchmark: /同类型红人|价格参考|benchmark|reference/i.test(source),
+    lowPriceProduct: /湿巾.*单价低|单价低|客单价低|价格低|产品价格低|lower price-point|low price/i.test(source),
+    exclusivity: /排他|独家|exclusiv/i.test(source),
+    dedicatedOnly: /单独|dedicated|单条|单支/i.test(source),
+    noIntegrated: /不做插播|不要插播|不接受插播|插播|not integrated|no integrated/i.test(source),
+    draftReview: /审核|review/i.test(source),
+    tightTimeline: /时间|timeline|urgent|asap|加急|尽快/i.test(source),
+  };
+}
+
 function reasonToEnglish(reason) {
   const value = cleanText(reason);
   if (REASON_TEXT[value]) return REASON_TEXT[value];
@@ -633,9 +655,30 @@ function reasonToEnglish(reason) {
 }
 
 function reasonSentence(reasons) {
-  const translated = reasons.map(reasonToEnglish).filter(Boolean);
-  if (!translated.length) return "";
-  const reasonText = sentenceList(translated);
+  if (!reasons.length) return "";
+  const flags = reasonFlags(reasons);
+  const reasonOptions = [];
+
+  if (flags.firstTrial && flags.lowPriceProduct) {
+    reasonOptions.push("since this is our first collaboration and the product has a lower price point, the client is keeping this round closer to a trial budget");
+  } else {
+    if (flags.firstTrial) reasonOptions.push("since this would be our first collaboration, the client would like to start with a trial budget");
+    if (flags.lowPriceProduct) reasonOptions.push("because this is a lower price-point product, the campaign budget is more limited");
+  }
+  if (flags.lowBudget) reasonOptions.push("the campaign budget is quite controlled for this round");
+  if (flags.scopePending) reasonOptions.push("the final budget will depend on the confirmed deliverables");
+  if (flags.longTerm) reasonOptions.push("if this first project goes well, we would love to explore more long-term opportunities");
+  if (flags.sampleIncluded) reasonOptions.push("the product sample will also be provided for you to experience and keep");
+  if (flags.benchmark) reasonOptions.push("we are also comparing rates across creators with a similar profile");
+  if (flags.exclusivity) reasonOptions.push("the client has an exclusivity requirement for this campaign");
+  if (flags.dedicatedOnly) reasonOptions.push("the client needs this to be a dedicated standalone video");
+  if (flags.noIntegrated) reasonOptions.push("integrated mentions or short insert-style placements would not work for this brief");
+  if (flags.draftReview) reasonOptions.push("the client needs to review the draft before posting");
+  if (flags.tightTimeline) reasonOptions.push("the campaign timeline is a bit tight");
+
+  const translated = reasons.map(reasonToEnglish).filter((item) => item && !hasChinese(item));
+  const reasonText = sentenceList(uniqueValues([...reasonOptions, ...translated]));
+  if (!reasonText) return "";
   return pickVariant("reason-sentence", [
     ` Just to share a little context, ${reasonText}.`,
     ` The main reason is that ${reasonText}.`,
@@ -671,6 +714,33 @@ function notesSentence(notes) {
   const items = translateCustomNotes(notes);
   if (!items.length) return "";
   return `\n\n${items.join("\n")}`;
+}
+
+function polishFinalEmail(email, context) {
+  let output = email;
+  output = output.replace(/\bOne small note from our side:\s*/gi, "");
+
+  const translatedNotes = notesSentence(context.notes).trim();
+  if (translatedNotes) {
+    output = output
+      .split("\n")
+      .map((line) => {
+        if (hasChinese(line) && /排他|独家|单独|不做插播|不要插播|不接受插播|插播/i.test(line)) {
+          return translatedNotes;
+        }
+        return line;
+      })
+      .join("\n");
+  }
+
+  output = output
+    .replace(/and\s+湿巾单价低/gi, "and because this is a lower price-point product, the campaign budget is more limited")
+    .replace(/,\s*湿巾单价低/gi, ", and because this is a lower price-point product, the campaign budget is more limited")
+    .replace(/湿巾单价低/gi, "because this is a lower price-point product, the campaign budget is more limited")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n");
+
+  return output.trim();
 }
 
 function pickVariant(key, options) {
@@ -944,7 +1014,7 @@ function generateEmail() {
 
   const subject = subjectForScenario(activeScenario);
   const body = generators[activeScenario](context).replace(/[ \t]+\n/g, "\n");
-  const normalizedBody = body.replace(/\n{3,}/g, "\n\n");
+  const normalizedBody = polishFinalEmail(body.replace(/\n{3,}/g, "\n\n"), context);
   currentEmail = `Subject: ${subject}\n\n${normalizedBody}`;
 
   elements.subjectText.textContent = subject;
