@@ -1050,7 +1050,7 @@ function generateEmail() {
   const subject = subjectForScenario(activeScenario);
   const body = generators[activeScenario](context).replace(/[ \t]+\n/g, "\n");
   const normalizedBody = polishFinalEmail(body.replace(/\n{3,}/g, "\n\n"), context);
-  currentEmail = `Subject: ${subject}\n\n${normalizedBody}`;
+  currentEmail = normalizedBody;
 
   elements.subjectText.textContent = subject;
   elements.subjectLine.classList.remove("is-hidden");
@@ -1085,8 +1085,7 @@ async function copyOutput() {
     setStatus("还没有可复制的邮件", "warn");
     return;
   }
-  const subject = cleanText(elements.subjectText.textContent);
-  currentEmail = subject ? `Subject: ${subject}\n\n${editedBody}` : editedBody;
+  currentEmail = editedBody;
   await navigator.clipboard.writeText(currentEmail);
   elements.copyBtn.classList.add("copied");
   elements.copyBtn.textContent = "已复制";
