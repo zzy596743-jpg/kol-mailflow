@@ -343,6 +343,12 @@ textarea:focus {
   color: var(--text);
   font-size: 14px;
   line-height: 1.72;
+  outline: none;
+}
+
+.output-box:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(62, 198, 162, 0.1);
 }
 
 .output-box.empty {

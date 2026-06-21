@@ -89,7 +89,13 @@
           <div id="subjectLine" class="subject-line is-hidden">
             <b>Subject:</b> <span id="subjectText"></span>
           </div>
-          <div id="outputBox" class="output-box empty">左侧填好信息后，点击「生成邮件」</div>
+          <div
+            id="outputBox"
+            class="output-box empty"
+            contenteditable="true"
+            role="textbox"
+            aria-label="邮件预览，可直接修改"
+          >左侧填好信息后，点击「生成邮件」</div>
 
           <div class="extracted">
             <div class="extracted-title">当前识别结果</div>
@@ -111,8 +117,8 @@
         </aside>
       </section>
     </main>
-    <div class="app-version">v28</div>
+    <div class="app-version">v29</div>
 
-    <script src="./app.js?v=28"></script>
+    <script src="./app.js?v=29"></script>
   </body>
 </html>

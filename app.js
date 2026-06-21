@@ -148,6 +148,7 @@ let activeScenario = "ask-details";
 let selected = {};
 let currentEmail = "";
 let manualEdited = new Set();
+let generationSeed = 0;
 let lastThreadContext = null;
 
 function cleanText(value) {
@@ -724,6 +725,15 @@ function translateCustomNotes(notes) {
   if (/未来.*(?:合作|机会|产品)|更多.*(?:合作|机会|产品)|长期机会|future opportunit|more product|more collaboration/i.test(text)) {
     items.push("If this first project goes smoothly, there may be more product launches and collaboration opportunities we can explore together.");
   }
+  if (/usage rights?|digital usage|ad purposes?|exclusivity|campaign period|paid usage|spark ads/i.test(text)) {
+    const usageDays = text.match(/(\d+)\s*-\s*day|\b(\d+)\s*day/i);
+    const days = usageDays ? `${usageDays[1] || usageDays[2]}-day` : "short-term";
+    if (/exclusivity/i.test(text)) {
+      items.push(`For usage, this would include ${days} digital usage rights for ad purposes, along with standard industry exclusivity during the campaign period.`);
+    } else {
+      items.push(`For usage, this would include ${days} digital usage rights for ad purposes.`);
+    }
+  }
   if (!items.length && !hasChinese(text)) items.push(text);
   return uniqueValues(items);
 }
@@ -762,7 +772,7 @@ function polishFinalEmail(email, context) {
 }
 
 function pickVariant(key, options) {
-  const base = `${key}|${cleanText(elements.rawEmail.value)}|${activeScenario}`;
+  const base = `${key}|${cleanText(elements.rawEmail.value)}|${activeScenario}|${generationSeed}`;
   let hash = 0;
   for (let index = 0; index < base.length; index += 1) {
     hash = (hash * 31 + base.charCodeAt(index)) % 100000;
@@ -878,6 +888,8 @@ function generateAskBudget(context) {
         "We are still matching rates with the final scope, so it would be helpful to see what package would work best for you.",
         "We are still confirming the creator mix, so I would rather check your usual package first and then take it back to the client.",
         "The final budget depends a bit on the package and platform, so your usual rate would really help us frame this properly.",
+        "I do not want to overstate the budget before the client finishes comparing options, so your usual package rate would be very helpful first.",
+        "We have a general range in mind, but I would rather understand what would feel fair on your side before I take it back internally.",
       ]);
   const askRate = pickVariant("budget-ask-rate", [
     `Would you be comfortable sharing what rate would work for you for ${deliverablePhrase(context)}${platformSuffix(context)}?`,
@@ -889,15 +901,22 @@ function generateAskBudget(context) {
   const opener = pickVariant("budget-opener", [
     "Thanks for asking — totally understand.",
     "Of course, happy to share a bit more context.",
-    "Totally fair question.",
     "Yes, absolutely — thanks for checking.",
     "I completely understand wanting to confirm the budget first.",
+    "That makes complete sense to ask before we get too far into the details.",
+    "Yes, I can share where we are at on budget.",
+    "I hear you — it is always helpful to align on budget early.",
+    "Absolutely, and I appreciate you checking this upfront.",
+    "Sure, happy to clarify the budget side a bit.",
   ]);
   const close = pickVariant("budget-close", [
     "I can then take it back to the client and try to push this forward from there.",
     "Once I have that, I can bring it to the client and see how close we can get.",
     "That will help me position this properly with the client.",
     "From there, I can check internally and come back with a clearer next step.",
+    "Once I have your thoughts, I can go back to the client with a more realistic recommendation.",
+    "That would give me something concrete to discuss with the client and hopefully keep this moving.",
+    "If we can find a number that feels reasonable on both sides, I would be happy to push it forward.",
   ]);
 
   return `${greeting(context.name)}
@@ -1018,6 +1037,7 @@ ${signature(context)}`;
 }
 
 function generateEmail() {
+  generationSeed += 1;
   const context = normalizeContext(buildContext());
   const generators = {
     "ask-details": generateAskDetails,
@@ -1060,10 +1080,13 @@ function setStatus(text, type = "") {
 }
 
 async function copyOutput() {
-  if (!currentEmail) {
+  const editedBody = elements.outputBox.classList.contains("empty") ? "" : elements.outputBox.innerText.trim();
+  if (!editedBody) {
     setStatus("还没有可复制的邮件", "warn");
     return;
   }
+  const subject = cleanText(elements.subjectText.textContent);
+  currentEmail = subject ? `Subject: ${subject}\n\n${editedBody}` : editedBody;
   await navigator.clipboard.writeText(currentEmail);
   elements.copyBtn.classList.add("copied");
   elements.copyBtn.textContent = "已复制";
@@ -1133,6 +1156,11 @@ function bindEvents() {
   });
 
   elements.generateBtn.addEventListener("click", generateEmail);
+  elements.outputBox.addEventListener("input", () => {
+    if (!elements.outputBox.classList.contains("empty")) {
+      setStatus("预览已手动修改，复制时会使用当前内容", "ok");
+    }
+  });
   elements.copyMemoBtn.addEventListener("click", copyMemo);
   elements.reparseBtn.addEventListener("click", () => {
     manualEdited.clear();
