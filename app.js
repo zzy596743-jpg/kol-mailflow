@@ -103,6 +103,7 @@ const elements = {
   productName: document.querySelector("#productName"),
   customNotes: document.querySelector("#customNotes"),
   generateBtn: document.querySelector("#generateBtn"),
+  reparseBtn: document.querySelector("#reparseBtn"),
   sampleBtn: document.querySelector("#sampleBtn"),
   clearBtn: document.querySelector("#clearBtn"),
   copyBtn: document.querySelector("#copyBtn"),
@@ -1104,6 +1105,14 @@ function bindEvents() {
   });
 
   elements.generateBtn.addEventListener("click", generateEmail);
+  elements.reparseBtn.addEventListener("click", () => {
+    manualEdited.clear();
+    ["creatorName", "senderName", "platformOverride", "quotedPrice", "deliverables", "productName"].forEach((key) => {
+      elements[key].value = "";
+    });
+    extractInfo({ overwrite: true });
+    setStatus("已重新识别当前邮件", "ok");
+  });
   elements.copyBtn.addEventListener("click", copyOutput);
   elements.clearBtn.addEventListener("click", clearAll);
   elements.sampleBtn.addEventListener("click", () => {
