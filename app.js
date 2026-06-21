@@ -1,15 +1,15 @@
 const SCENARIOS = {
   "ask-details": {
     title: "问具体信息",
-    desc: "红人只说感兴趣，需要补报价、档期、内容形式",
+    desc: "红人只说感兴趣，需要补报价、档期、账号数据等",
     subject: "Thanks for your interest in our collaboration",
     fields: [
       {
         id: "questions",
         label: "需要补问的信息",
         type: "multi",
-        options: ["报价", "合作内容形式", "档期/交稿时间", "账号数据/媒体包", "是否有使用限制"],
-        defaults: ["报价", "合作内容形式", "档期/交稿时间"],
+        options: ["报价", "档期/交稿时间", "账号数据/媒体包", "是否有使用限制"],
+        defaults: ["报价", "档期/交稿时间"],
       },
     ],
     reasons: ["方便向客户准确报备", "客户需要完整信息后才能确认", "想先确认内容是否匹配"],
@@ -21,7 +21,8 @@ const SCENARIOS = {
     fields: [
       { id: "budget", label: "可透露预算 / 价格", type: "text", placeholder: "例如 $300，留空则让对方先报价" },
     ],
-    reasons: ["项目预算有限", "预算需根据最终内容确认", "首次合作先试水", "客户还在比较红人报价"],
+    reasons: ["项目预算有限", "预算需根据最终内容确认", "首次合作先试水", "客户还在比较红人报价", "未来有更多产品和合作机会"],
+    defaultReasons: ["项目预算有限", "未来有更多产品和合作机会"],
   },
   "negotiate-price": {
     title: "砍价",
@@ -73,6 +74,7 @@ const REASON_TEXT = {
   "预算需根据最终内容确认": "the final budget will depend on the confirmed deliverables",
   "首次合作先试水": "since this would be our first collaboration, the client hopes to start with a trial budget",
   "客户还在比较红人报价": "the client is still reviewing creator options and rates",
+  "未来有更多产品和合作机会": "there may be more product launches and collaboration opportunities after this first round",
   "希望后续长期合作": "if this first project goes well, we would love to explore more long-term opportunities",
   "同类型红人价格参考": "this is close to the approved range for similar creators in this campaign",
   "样品也会免费寄送": "the product sample will also be provided for you to experience and keep",
@@ -91,6 +93,8 @@ const DEFAULT_PLATFORM_PACKAGES = {
   TikTok: "TikTok: 1 dedicated video + 7-day link in bio",
 };
 
+const MEMO_STORAGE_KEY = "kolMailFlowMemo";
+
 const elements = {
   rawEmail: document.querySelector("#rawEmail"),
   scenarioCards: document.querySelector("#scenarioCards"),
@@ -107,6 +111,8 @@ const elements = {
   sampleBtn: document.querySelector("#sampleBtn"),
   clearBtn: document.querySelector("#clearBtn"),
   copyBtn: document.querySelector("#copyBtn"),
+  memoBoard: document.querySelector("#memoBoard"),
+  copyMemoBtn: document.querySelector("#copyMemoBtn"),
   statusText: document.querySelector("#statusText"),
   subjectLine: document.querySelector("#subjectLine"),
   subjectText: document.querySelector("#subjectText"),
@@ -189,7 +195,7 @@ function renderDynamicFields() {
   reasonLabel.className = "field-label with-space";
   reasonLabel.textContent = "场景理由";
   elements.dynamicFields.appendChild(reasonLabel);
-  renderChipGroup("reasons", scenario.reasons, "multi", scenario.reasons.slice(0, activeScenario === "contract-address" ? 2 : 1));
+  renderChipGroup("reasons", scenario.reasons, "multi", scenario.defaultReasons || scenario.reasons.slice(0, activeScenario === "contract-address" ? 2 : 1));
 
   const custom = document.createElement("input");
   custom.id = "field_customReason";
@@ -634,6 +640,7 @@ function reasonFlags(reasons) {
     longTerm: /长期合作|long-term|long term/i.test(source),
     sampleIncluded: /样品|sample/i.test(source),
     benchmark: /同类型红人|价格参考|benchmark|reference/i.test(source),
+    futureOpportunities: /未来.*(?:合作|机会|产品)|更多.*(?:合作|机会|产品)|长期机会|more product launches|more collaboration opportunities|future opportunities/i.test(source),
     lowPriceProduct: /湿巾.*单价低|单价低|客单价低|价格低|产品价格低|lower price-point|low price/i.test(source),
     exclusivity: /排他|独家|exclusiv/i.test(source),
     dedicatedOnly: /单独|dedicated|单条|单支/i.test(source),
@@ -651,6 +658,7 @@ function reasonToEnglish(reason) {
   if (value.includes("预算有限")) return "the campaign budget is quite controlled for this round";
   if (value.includes("首次合作")) return "since this would be our first collaboration, the client hopes to start with a trial budget";
   if (value.includes("长期合作")) return "if this first project goes well, we would love to explore more long-term opportunities";
+  if (/未来.*(?:合作|机会|产品)|更多.*(?:合作|机会|产品)|长期机会/i.test(value)) return "there may be more product launches and collaboration opportunities after this first round";
   if (value.includes("样品")) return "the product sample will also be provided for you to experience and keep";
   if (value.includes("审核")) return "the client needs to review the draft before posting";
   if (value.includes("时间")) return "the campaign timeline is a bit tight";
@@ -676,6 +684,7 @@ function reasonSentence(reasons) {
   if (flags.longTerm) reasonOptions.push("if this first project goes well, we would love to explore more long-term opportunities");
   if (flags.sampleIncluded) reasonOptions.push("the product sample will also be provided for you to experience and keep");
   if (flags.benchmark) reasonOptions.push("we are also comparing rates across creators with a similar profile");
+  if (flags.futureOpportunities) reasonOptions.push("there may be more product launches and collaboration opportunities after this first round");
   if (flags.exclusivity) reasonOptions.push("the client has an exclusivity requirement for this campaign");
   if (flags.dedicatedOnly) reasonOptions.push("the client needs this to be a dedicated standalone video");
   if (flags.noIntegrated) reasonOptions.push("integrated mentions or short insert-style placements would not work for this brief");
@@ -712,7 +721,10 @@ function translateCustomNotes(notes) {
   if (/加急|尽快|urgent|asap/i.test(text)) {
     items.push("The timeline is a little tight, so a quick confirmation would be very helpful.");
   }
-  if (!items.length) items.push(text);
+  if (/未来.*(?:合作|机会|产品)|更多.*(?:合作|机会|产品)|长期机会|future opportunit|more product|more collaboration/i.test(text)) {
+    items.push("If this first project goes smoothly, there may be more product launches and collaboration opportunities we can explore together.");
+  }
+  if (!items.length && !hasChinese(text)) items.push(text);
   return uniqueValues(items);
 }
 
@@ -793,7 +805,6 @@ function generateAskDetails(context) {
   const questions = selectedValues("questions");
   const missingFromThread = [];
   if (context.thread.asked.rate && !context.thread.given.rate) missingFromThread.push("报价");
-  if (context.thread.asked.deliverables && !context.thread.given.deliverables) missingFromThread.push("合作内容形式");
   if (context.thread.asked.timeline && !context.thread.given.timeline) missingFromThread.push("档期/交稿时间");
   if (context.thread.asked.mediaKit && !context.thread.given.mediaKit) missingFromThread.push("账号数据/媒体包");
   if (context.thread.asked.restrictions && !context.thread.given.restrictions) missingFromThread.push("是否有使用限制");
@@ -801,7 +812,6 @@ function generateAskDetails(context) {
 
   const questionMap = {
     报价: "your rate for this collaboration",
-    合作内容形式: "the content package you would suggest",
     "档期/交稿时间": context.thread.timelinePrompt || "your usual timeline after receiving the sample",
     "账号数据/媒体包": "your media kit or recent account insights, if you have them handy",
     是否有使用限制: "any usage or posting restrictions we should know about",
@@ -810,7 +820,6 @@ function generateAskDetails(context) {
   const items = uniqueValues([...missingFromThread, ...questions])
     .filter((item) => {
       if (item === "报价") return !context.thread.given.rate;
-      if (item === "合作内容形式") return !context.thread.given.deliverables && !context.deliverables;
       if (item === "档期/交稿时间") return !context.thread.given.timeline;
       if (item === "账号数据/媒体包") return !context.thread.given.mediaKit;
       if (item === "是否有使用限制") return !context.thread.given.restrictions;
@@ -1065,6 +1074,20 @@ async function copyOutput() {
   setStatus("已复制到剪贴板", "ok");
 }
 
+async function copyMemo() {
+  const text = cleanText(elements.memoBoard.value);
+  if (!text) {
+    setStatus("备忘录还是空的", "warn");
+    return;
+  }
+  await navigator.clipboard.writeText(elements.memoBoard.value);
+  elements.copyMemoBtn.textContent = "已复制";
+  setTimeout(() => {
+    elements.copyMemoBtn.textContent = "复制";
+  }, 1300);
+  setStatus("备忘录已复制", "ok");
+}
+
 function clearAll() {
   [
     "rawEmail",
@@ -1089,6 +1112,11 @@ function clearAll() {
 }
 
 function bindEvents() {
+  elements.memoBoard.value = localStorage.getItem(MEMO_STORAGE_KEY) || "";
+  elements.memoBoard.addEventListener("input", () => {
+    localStorage.setItem(MEMO_STORAGE_KEY, elements.memoBoard.value);
+  });
+
   elements.rawEmail.addEventListener("input", () => {
     manualEdited.clear();
     ["creatorName", "senderName", "platformOverride", "quotedPrice", "deliverables", "productName"].forEach((key) => {
@@ -1105,6 +1133,7 @@ function bindEvents() {
   });
 
   elements.generateBtn.addEventListener("click", generateEmail);
+  elements.copyMemoBtn.addEventListener("click", copyMemo);
   elements.reparseBtn.addEventListener("click", () => {
     manualEdited.clear();
     ["creatorName", "senderName", "platformOverride", "quotedPrice", "deliverables", "productName"].forEach((key) => {

@@ -274,7 +274,7 @@ textarea:focus {
 
 .actions {
   display: grid;
-  grid-template-columns: 1fr 82px 82px;
+  grid-template-columns: 1fr repeat(3, minmax(76px, 92px));
   gap: 10px;
   margin-top: 18px;
 }
@@ -384,6 +384,46 @@ textarea:focus {
 
 .tag b {
   color: var(--accent-2);
+}
+
+.memo-panel {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.memo-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+}
+
+.memo-head .extracted-title {
+  margin-bottom: 0;
+}
+
+.small-btn {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+.memo-board {
+  min-height: 160px;
+  resize: vertical;
+  line-height: 1.55;
+  font-size: 13px;
+}
+
+.app-version {
+  position: fixed;
+  right: 12px;
+  bottom: 10px;
+  color: var(--faint);
+  font-size: 11px;
+  pointer-events: none;
 }
 
 @media (max-width: 980px) {
