@@ -41,6 +41,7 @@ button {
   min-height: 40px;
   padding: 0 14px;
   cursor: pointer;
+  white-space: nowrap;
 }
 
 button:hover {
@@ -274,7 +275,7 @@ textarea:focus {
 
 .actions {
   display: grid;
-  grid-template-columns: 1fr repeat(3, minmax(76px, 92px));
+  grid-template-columns: minmax(150px, 1fr) 96px 64px 64px;
   gap: 10px;
   margin-top: 18px;
 }
