@@ -20,6 +20,13 @@ const SCENARIOS = {
     subject: "Re: Collaboration details",
     fields: [
       { id: "budget", label: "可透露预算 / 价格", type: "text", placeholder: "例如 $300，留空则让对方先报价" },
+      {
+        id: "valueAdds",
+        label: "加分话术",
+        type: "multi",
+        options: ["合作很轻量", "可用音乐+花字", "未来大件产品优先", "使用权和排他清晰"],
+        defaults: ["合作很轻量", "未来大件产品优先"],
+      },
     ],
     reasons: ["项目预算有限", "预算需根据最终内容确认", "首次合作先试水", "客户还在比较红人报价", "未来有更多产品和合作机会"],
     defaultReasons: ["项目预算有限", "未来有更多产品和合作机会"],
@@ -30,8 +37,33 @@ const SCENARIOS = {
     subject: "Re: Collaboration rate",
     fields: [
       { id: "targetPrice", label: "客户可接受价格", type: "text", placeholder: "例如 $350" },
+      {
+        id: "valueAdds",
+        label: "加分话术",
+        type: "multi",
+        options: ["强调已向品牌争取", "合作很轻量", "可用音乐+花字", "未来大件产品优先"],
+        defaults: ["强调已向品牌争取", "合作很轻量", "未来大件产品优先"],
+      },
     ],
     reasons: ["客户预算有限", "首次合作先试水", "希望后续长期合作", "同类型红人价格参考", "样品也会免费寄送"],
+  },
+  "sweetener-followup": {
+    title: "加价跟进",
+    desc: "对方未回复时，前置更高预算和减负条件",
+    subject: "Re: Updated budget for this collaboration",
+    fields: [
+      { id: "newBudget", label: "新争取到的预算", type: "text", placeholder: "例如 $550" },
+      { id: "personalNote", label: "个性化近况问候", type: "text", placeholder: "例如 Happy birthday to your twins / Loved your recent Pilates update，可留空" },
+      {
+        id: "valueAdds",
+        label: "加分话术",
+        type: "multi",
+        options: ["主动争取更高预算", "合作很轻量", "可用音乐+花字", "未来大件产品优先", "使用权和排他清晰"],
+        defaults: ["主动争取更高预算", "合作很轻量", "未来大件产品优先"],
+      },
+    ],
+    reasons: ["非常认可内容质量", "希望降低合作门槛", "首次合作先试水", "未来有更多产品和合作机会"],
+    defaultReasons: ["非常认可内容质量", "未来有更多产品和合作机会"],
   },
   "contract-address": {
     title: "签合同/问地址",
@@ -75,6 +107,8 @@ const REASON_TEXT = {
   "首次合作先试水": "since this would be our first collaboration, the client hopes to start with a trial budget",
   "客户还在比较红人报价": "the client is still reviewing creator options and rates",
   "未来有更多产品和合作机会": "there may be more product launches and collaboration opportunities after this first round",
+  "非常认可内容质量": "we really value the quality of your content",
+  "希望降低合作门槛": "we want to keep the collaboration simple and easy to execute",
   "希望后续长期合作": "if this first project goes well, we would love to explore more long-term opportunities",
   "同类型红人价格参考": "this is close to the approved range for similar creators in this campaign",
   "样品也会免费寄送": "the product sample will also be provided for you to experience and keep",
@@ -91,6 +125,15 @@ const REASON_TEXT = {
 const DEFAULT_PLATFORM_PACKAGES = {
   Instagram: "Instagram: 1 Reel + Story Highlights for 3 days + 7-day link in bio",
   TikTok: "TikTok: 1 dedicated video + 7-day link in bio",
+};
+
+const VALUE_ADD_TEXT = {
+  "主动争取更高预算": "I went back to the brand team to advocate for you because we genuinely like the quality of your content.",
+  "强调已向品牌争取": "I did go back to the brand team and pushed for the best number I could get approved on this round.",
+  "合作很轻量": "No heavy scripting is required; you can keep your usual authentic lifestyle or parenting style.",
+  "可用音乐+花字": "If voiceover feels like too much, a fast-paced video with trending sound and text overlays would also work for us.",
+  "未来大件产品优先": "If this first test goes smoothly, we can prioritize you for future higher-budget launches across the brand's pipeline, such as pumps, warmers, cameras, and other bigger-ticket products.",
+  "使用权和排他清晰": "We can keep the usage and exclusivity terms clear upfront so it is easy for you or your manager to review.",
 };
 
 const MEMO_STORAGE_KEY = "kolMailFlowMemo";
@@ -505,6 +548,19 @@ function platformSelectionNote(context) {
   return "\n\nThe client may choose Instagram, TikTok, or both platforms later based on your account data and campaign fit, so it would be helpful to have the rates for both options first.";
 }
 
+function valueAddBullets(context, options = selectedValues("valueAdds")) {
+  const lines = options.map((item) => VALUE_ADD_TEXT[item]).filter(Boolean);
+  if (!lines.length) return "";
+  return `\n\nA few things that may make this easier to consider:\n- ${lines.join("\n- ")}`;
+}
+
+function personalNoteLine(note) {
+  const text = cleanText(note);
+  if (!text) return "";
+  if (/[.!?]$/.test(text)) return text;
+  return text;
+}
+
 function subjectForScenario(scenario) {
   const subjects = {
     "ask-details": [
@@ -522,6 +578,11 @@ function subjectForScenario(scenario) {
       "Re: Collaboration rate",
       "Re: Rate for this campaign",
       "Re: Campaign budget update",
+    ],
+    "sweetener-followup": [
+      "Re: Updated budget for this collaboration",
+      "Re: Improved budget and easier content scope",
+      "Re: A better setup for the campaign",
     ],
     "contract-address": [
       "Next steps for our collaboration",
@@ -926,6 +987,7 @@ ${opener}
 ${budgetLine}${reasonSentence(context.reasons)}
 
 ${askRate} If you have separate package options, that would be even better.${platformSelectionNote(context)}
+${valueAddBullets(context)}
 
 ${close}${notesSentence(context.notes)}
 
@@ -954,8 +1016,51 @@ Thank you again for sharing the details.
 ${quote} They really like your content and would like to move forward, but the number they approved on their side is ${target}.${reasonSentence(context.reasons)}
 
 ${ask} I know it is a bit lower than your original rate, but we would genuinely love to make this collaboration work.${platformSelectionNote(context)}
+${valueAddBullets(context)}
 
 Let me know what you think, and if it works, I can move into the next step right away.${notesSentence(context.notes)}
+
+${signature(context)}`;
+}
+
+function generateSweetenerFollowup(context) {
+  const newBudget = fieldValue("newBudget") || fieldValue("targetPrice") || fieldValue("budget");
+  const personalNote = personalNoteLine(fieldValue("personalNote"));
+  const budgetLine = newBudget
+    ? pickVariant("sweetener-budget-number", [
+        `I went back to the brand team to advocate for you, and I was able to get the budget increased to ${newBudget}.`,
+        `Because we really like your content quality, I pushed this again internally and got the brand to move the budget up to ${newBudget}.`,
+        `I did not want to lose the chance to work together, so I went back to the brand team and got ${newBudget} approved for this round.`,
+      ])
+    : pickVariant("sweetener-budget-no-number", [
+        "I went back to the brand team to advocate for you and asked if we could make the setup a bit stronger.",
+        "Because we really like your content quality, I checked internally again to see how we could make this easier to say yes to.",
+        "I wanted to follow up with a more thoughtful setup instead of just sending a plain reminder.",
+      ]);
+  const opener = pickVariant("sweetener-opener", [
+    "I wanted to quickly follow up with a better setup for this collaboration.",
+    "Just wanted to come back with a more concrete update on this campaign.",
+    "I wanted to circle back because I still think this could be a really good fit.",
+  ]);
+  const deliverableLine = context.deliverables
+    ? `For clarity, the current content scope would be ${deliverablePhrase(context)}${platformSuffix(context)}.`
+    : "For clarity, we can keep the scope simple and easy to review.";
+  const close = pickVariant("sweetener-close", [
+    "Would this updated setup feel more workable on your side?",
+    "If this feels closer, I would be happy to take your confirmation back to the client.",
+    "Let me know if this makes the collaboration easier to consider, and I can move it forward from there.",
+  ]);
+
+  return `${greeting(context.name)}
+
+${personalNote ? `${personalNote}\n\n` : ""}${opener}
+
+${budgetLine}
+
+${deliverableLine}${platformSelectionNote(context)}
+${valueAddBullets(context)}
+
+${close}${notesSentence(context.notes)}
 
 ${signature(context)}`;
 }
@@ -1043,6 +1148,7 @@ function generateEmail() {
     "ask-details": generateAskDetails,
     "ask-budget": generateAskBudget,
     "negotiate-price": generateNegotiation,
+    "sweetener-followup": generateSweetenerFollowup,
     "contract-address": generateContractAddress,
     "follow-up-draft": generateFollowUpDraft,
   };
