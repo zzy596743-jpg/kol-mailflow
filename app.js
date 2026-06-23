@@ -577,6 +577,56 @@ function valueAddBullets(context, options = selectedValues("valueAdds")) {
   return `\n\nA few things that may make this easier to consider:\n- ${lines.join("\n- ")}`;
 }
 
+function firstValue(values) {
+  return values.length ? values[0] : "";
+}
+
+function conversationSignals(context) {
+  const fullText = context.thread.fullText || "";
+  const creatorReply = context.thread.creatorReply || "";
+  const ourText = context.thread.ourText || "";
+  const creatorPrices = extractPrices(creatorReply);
+  const ourPrices = extractPrices(ourText);
+  return {
+    creatorRate: creatorPrices[0] || context.quotedPrice,
+    latestOffer: firstValue(ourPrices),
+    hasBackAndForth: (fullText.match(/-----原始邮件-----|On .+ wrote:/gi) || []).length >= 2,
+    openFuture: /\b(?:future|check back|couple months|few months|later|next time)\b/i.test(creatorReply),
+    noVoiceover: /\b(?:no voiceover|without voiceover|won't be able to do a voiceover|voiceover.*(?:not|isn't).{0,30}seamless)\b/i.test(fullText),
+    trendingTextOverlay: /\b(?:trending sound|text overlay|on-screen text|without any voiceover)\b/i.test(fullText),
+    alreadySimplified: /\b(?:no heavy scripting|no formal scripting|required|trending sound|text overlay|Instagram-only|single platform)\b/i.test(ourText),
+    alreadyAdvocated: /\b(?:went back to the brand team|advocate|managed to secure|increased flat rate|higher flat rate|stretch our budget)\b/i.test(ourText),
+    hadContractStep: /\b(?:contract template|agreement|next steps|get your product shipped|product shipped out)\b/i.test(ourText),
+  };
+}
+
+function contextBridgeLine(context, scenario) {
+  const signals = conversationSignals(context);
+  if (scenario === "rate-decline") {
+    if (signals.alreadyAdvocated && signals.latestOffer) {
+      return `I know we had already tried to stretch the budget to ${signals.latestOffer} and make the scope easier on your side, so I really appreciate you considering it seriously.`;
+    }
+    if (signals.alreadySimplified) {
+      return "I also appreciate you taking the time to consider the simplified content setup we discussed.";
+    }
+    if (signals.hasBackAndForth) {
+      return "I know we have gone back and forth on the details, so I really appreciate your patience throughout the conversation.";
+    }
+  }
+  if (scenario === "sweetener-followup") {
+    if (signals.noVoiceover && signals.trendingTextOverlay) {
+      return "I also remembered your preference for keeping the content seamless, so we can keep the format closer to trending sound with text overlay rather than a heavy voiceover.";
+    }
+    if (signals.noVoiceover) {
+      return "I also noted your concern about voiceover, so we can keep the content direction as natural to your usual style as possible.";
+    }
+  }
+  if (scenario === "negotiate-price" && signals.noVoiceover) {
+    return "I also kept your note about voiceover in mind and will make sure the content direction stays as natural as possible for your style.";
+  }
+  return "";
+}
+
 function personalNoteLine(note) {
   const text = cleanText(note);
   if (!text) return "";
@@ -1078,6 +1128,7 @@ ${signature(context)}`;
 
 function generateNegotiation(context) {
   const target = fieldValue("targetPrice") || "[target price]";
+  const bridge = contextBridgeLine(context, "negotiate-price");
   const quote = context.quotedPrice
     ? pickVariant("negotiation-quote", [
         `I brought your ${context.quotedPrice} rate to the client.`,
@@ -1096,6 +1147,7 @@ function generateNegotiation(context) {
 Thank you again for sharing the details.
 
 ${quote} They really like your content and would like to move forward, but the number they approved on their side is ${target}.${reasonSentence(context.reasons)}
+${bridge ? `\n\n${bridge}` : ""}
 
 ${ask} I know it is a bit lower than your original rate, but we would genuinely love to make this collaboration work.${platformSelectionNote(context)}
 ${valueAddBullets(context)}
@@ -1108,6 +1160,7 @@ ${signature(context)}`;
 function generateSweetenerFollowup(context) {
   const newBudget = fieldValue("newBudget") || fieldValue("targetPrice") || fieldValue("budget");
   const personalNote = personalNoteLine(fieldValue("personalNote"));
+  const bridge = contextBridgeLine(context, "sweetener-followup");
   const budgetLine = newBudget
     ? pickVariant("sweetener-budget-number", [
         `I went back to the brand team to advocate for you, and I was able to get the budget increased to ${newBudget}.`,
@@ -1139,7 +1192,7 @@ ${personalNote ? `${personalNote}\n\n` : ""}${opener}
 
 ${budgetLine}
 
-${deliverableLine}${platformSelectionNote(context)}
+${bridge ? `${bridge}\n\n` : ""}${deliverableLine}${platformSelectionNote(context)}
 ${valueAddBullets(context)}
 
 ${close}${notesSentence(context.notes)}
@@ -1149,6 +1202,8 @@ ${signature(context)}`;
 
 function generateRateDecline(context) {
   const futureTiming = fieldValue("futureTiming") || extractFutureTiming(context.thread.creatorReply) || "when a better-fit opportunity comes up";
+  const signals = conversationSignals(context);
+  const bridge = contextBridgeLine(context, "rate-decline");
   const declinedRate = fieldValue("declinedRate") || extractPrices(context.thread.creatorReply)[0] || context.quotedPrice;
   const warmWish = personalNoteLine(fieldValue("warmWish"));
   const isLowPriceProduct = /wipe|wipes|湿巾/i.test(context.productName);
@@ -1178,6 +1233,9 @@ function generateRateDecline(context) {
     `I will keep your profile at the top of our list and reach out ${futureTiming} as soon as we have higher-budget campaigns that can better match your standard rates.`,
     `I would love to keep you in mind for future higher-budget launches, and I can check back ${futureTiming} when we have a stronger-fit campaign.`,
   ]);
+  const relationshipLine = signals.hadContractStep
+    ? "Since we had already started discussing next steps, I especially appreciate you being direct with me before we moved further."
+    : "";
   const wishLine = warmWish
     ? `${warmWish}${/[.!?]$/.test(warmWish) ? "" : "."} Let's definitely stay in touch.`
     : pickVariant("rate-decline-wish", [
@@ -1195,7 +1253,7 @@ function generateRateDecline(context) {
 
 ${opener}
 
-${budgetLine}
+${bridge ? `${bridge}\n\n` : ""}${relationshipLine ? `${relationshipLine}\n\n` : ""}${budgetLine}
 
 ${futureLine}
 
