@@ -70,13 +70,15 @@ const SCENARIOS = {
     desc: "红人坚持原报价，本轮不继续压价，保持未来合作",
     subject: "Re: Thanks for letting me know",
     fields: [
+      { id: "declinedRate", label: "本轮价格 / 对方坚持价格", type: "text", placeholder: "例如 $1,000 / $200，可留空自动识别" },
       { id: "futureTiming", label: "未来跟进时间", type: "text", placeholder: "例如 in a couple months，可留空自动识别" },
+      { id: "warmWish", label: "个性化祝福", type: "text", placeholder: "例如 Wishing your girls the most wonderful birthday celebrations，可留空" },
       {
         id: "valueAdds",
         label: "保留关系重点",
         type: "multi",
-        options: ["感谢考虑", "尊重对方报价", "保留未来机会", "未来大件产品优先"],
-        defaults: ["感谢考虑", "尊重对方报价", "保留未来机会"],
+        options: ["尊重对方报价", "本轮明确pass", "保留未来机会", "未来大件产品优先"],
+        defaults: ["尊重对方报价", "本轮明确pass", "保留未来机会", "未来大件产品优先"],
       },
     ],
     reasons: ["客户预算有限", "非常认可内容质量", "未来有更多产品和合作机会"],
@@ -154,6 +156,7 @@ const VALUE_ADD_TEXT = {
   "感谢考虑": "Thank you again for taking the time to consider this campaign.",
   "尊重对方报价": "I completely understand and respect you sticking to your usual rate.",
   "保留未来机会": "I would still love to keep the door open for a future collaboration when the budget is a better fit.",
+  "本轮明确pass": "For this specific campaign, we will have to pass this time rather than keep pushing you below your standard rate.",
 };
 
 const MEMO_STORAGE_KEY = "kolMailFlowMemo";
@@ -347,7 +350,7 @@ function extractPersonFromHeader(value) {
 }
 
 function isIflyAddress(value) {
-  return /@iflytalent\.(?:cn|world|work)\b/i.test(value) || /\biflytalent team\b/i.test(value);
+  return /@iflytalent\.(?:cn|world|work|org)\b/i.test(value) || /\biflytalent team\b/i.test(value);
 }
 
 function blockSender(block) {
@@ -1107,28 +1110,46 @@ ${signature(context)}`;
 
 function generateRateDecline(context) {
   const futureTiming = fieldValue("futureTiming") || extractFutureTiming(context.thread.creatorReply) || "when a better-fit opportunity comes up";
+  const declinedRate = fieldValue("declinedRate") || extractPrices(context.thread.creatorReply)[0] || context.quotedPrice;
+  const warmWish = personalNoteLine(fieldValue("warmWish"));
+  const isLowPriceProduct = /wipe|wipes|湿巾/i.test(context.productName);
+  const productPhrase = context.productName && context.productName !== "the product"
+    ? isLowPriceProduct
+      ? `this specific low-priced ${context.productName} campaign`
+      : `this specific ${context.productName} campaign`
+    : "this specific campaign";
   const opener = pickVariant("rate-decline-opener", [
-    "Thank you so much for getting back to me and for being clear about your rate.",
-    "Thanks for letting me know, and I completely understand.",
-    "I really appreciate your honest reply here.",
+    "Thank you for your quick reply and for being so upfront about your rate.",
+    "Thank you for your quick and honest reply.",
+    "Thanks so much for letting me know, and I really appreciate the transparency.",
   ]);
-  const budgetLine = pickVariant("rate-decline-budget", [
-    "For this specific round, I do not think we will be able to meet that number, but I completely respect you sticking to your usual rate.",
-    "For this campaign, the approved budget is still a bit below your rate, so I do not want to keep pushing you on a number that does not feel right on your side.",
-    "It sounds like this round may not be the right fit budget-wise, and that is totally understandable.",
-  ]);
+  const budgetLine = declinedRate
+    ? pickVariant("rate-decline-budget-rate", [
+        `I completely understand and respect your decision to stick to your standard pricing. While we cannot quite make the ${declinedRate} rate work for ${productPhrase}, we would absolutely love to partner with you on future projects.`,
+        `I completely understand and respect your decision regarding the pricing. Since our current budget for ${productPhrase} is limited, we will have to pass this time, but we would still love to work with you in the future.`,
+        `I fully understand you needing to stay at ${declinedRate}. For ${productPhrase}, the budget is still too limited on our side, so I do not want to keep pushing you below your standard rate.`,
+      ])
+    : pickVariant("rate-decline-budget-no-rate", [
+        `I completely understand and respect your decision regarding the pricing. Since our current budget for ${productPhrase} is limited, we will have to pass this time, but we would still love to work with you in the future.`,
+        `For ${productPhrase}, the budget is still too limited on our side, so I do not want to keep pushing you below your standard rate.`,
+        `It sounds like this round may not be the right fit budget-wise, and I completely understand.`,
+      ]);
   const futureLine = pickVariant("rate-decline-future", [
-    `I would still love to keep the door open and check back ${futureTiming}.`,
-    `I will keep your profile in mind and would be happy to reconnect ${futureTiming}.`,
-    `If you are open to it, I can check back ${futureTiming} when we have a campaign that better matches your rate.`,
+    `I will definitely keep your profile at the top of our list and check back ${futureTiming} when we have higher-budget baby gear or nursery electronics campaigns launching.`,
+    `I will keep your profile at the top of our list and reach out ${futureTiming} as soon as we have higher-budget campaigns that can better match your standard rates.`,
+    `I would love to keep you in mind for future higher-budget launches, and I can check back ${futureTiming} when we have a stronger-fit campaign.`,
   ]);
-  const brandLine = context.productName && context.productName !== "the product"
-    ? `We really like your content fit for ${context.productName}, so I would be happy to keep you in mind for future opportunities.`
-    : "We really like your content style, so I would be happy to keep you in mind for future opportunities.";
+  const wishLine = warmWish
+    ? `${warmWish}${/[.!?]$/.test(warmWish) ? "" : "."} Let's definitely stay in touch.`
+    : pickVariant("rate-decline-wish", [
+        "Wishing you and your family a wonderful season ahead, and we will stay in touch.",
+        "Thanks again for considering this one, and let's definitely stay in touch.",
+        "Really appreciate your time, and I hope we can find a better fit soon.",
+      ]);
   const close = pickVariant("rate-decline-close", [
-    "Thanks again for considering this one, and I hope we can find a better fit soon.",
     "Thank you again, and I hope we can work together on a stronger-fit campaign in the future.",
-    "Really appreciate your time, and I will stay in touch for future opportunities.",
+    "Really appreciate your time and openness here.",
+    "Thank you again for considering this campaign.",
   ]);
 
   return `${greeting(context.name)}
@@ -1137,10 +1158,9 @@ ${opener}
 
 ${budgetLine}
 
-${brandLine}
-
 ${futureLine}
-${valueAddBullets(context)}
+
+${wishLine}
 
 ${close}${notesSentence(context.notes)}
 
