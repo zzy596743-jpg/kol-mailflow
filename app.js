@@ -65,6 +65,23 @@ const SCENARIOS = {
     reasons: ["非常认可内容质量", "希望降低合作门槛", "首次合作先试水", "未来有更多产品和合作机会"],
     defaultReasons: ["非常认可内容质量", "未来有更多产品和合作机会"],
   },
+  "rate-decline": {
+    title: "婉拒保留机会",
+    desc: "红人坚持原报价，本轮不继续压价，保持未来合作",
+    subject: "Re: Thanks for letting me know",
+    fields: [
+      { id: "futureTiming", label: "未来跟进时间", type: "text", placeholder: "例如 in a couple months，可留空自动识别" },
+      {
+        id: "valueAdds",
+        label: "保留关系重点",
+        type: "multi",
+        options: ["感谢考虑", "尊重对方报价", "保留未来机会", "未来大件产品优先"],
+        defaults: ["感谢考虑", "尊重对方报价", "保留未来机会"],
+      },
+    ],
+    reasons: ["客户预算有限", "非常认可内容质量", "未来有更多产品和合作机会"],
+    defaultReasons: ["非常认可内容质量", "未来有更多产品和合作机会"],
+  },
   "contract-address": {
     title: "签合同/问地址",
     desc: "砍价成功，收集合同和寄样信息",
@@ -134,6 +151,9 @@ const VALUE_ADD_TEXT = {
   "可用音乐+花字": "If voiceover feels like too much, a fast-paced video with trending sound and text overlays would also work for us.",
   "未来大件产品优先": "If this first test goes smoothly, we can prioritize you for future higher-budget launches across the brand's pipeline, such as pumps, warmers, cameras, and other bigger-ticket products.",
   "使用权和排他清晰": "We can keep the usage and exclusivity terms clear upfront so it is easy for you or your manager to review.",
+  "感谢考虑": "Thank you again for taking the time to consider this campaign.",
+  "尊重对方报价": "I completely understand and respect you sticking to your usual rate.",
+  "保留未来机会": "I would still love to keep the door open for a future collaboration when the budget is a better fit.",
 };
 
 const MEMO_STORAGE_KEY = "kolMailFlowMemo";
@@ -327,7 +347,7 @@ function extractPersonFromHeader(value) {
 }
 
 function isIflyAddress(value) {
-  return /@iflytalent\.(?:cn|world)\b/i.test(value) || /\biflytalent team\b/i.test(value);
+  return /@iflytalent\.(?:cn|world|work)\b/i.test(value) || /\biflytalent team\b/i.test(value);
 }
 
 function blockSender(block) {
@@ -561,6 +581,21 @@ function personalNoteLine(note) {
   return text;
 }
 
+function extractFutureTiming(text) {
+  const clean = cleanText(text);
+  const patterns = [
+    /\b(?:in|after)\s+(?:a\s+)?(?:couple|few)\s+months?\b/i,
+    /\b(?:in|after)\s+\d+\s+months?\b/i,
+    /\bnext\s+(?:month|quarter|season)\b/i,
+    /\bwhen\s+(?:you|the brand|we)\s+[^.?!]{0,80}\b/i,
+  ];
+  for (const pattern of patterns) {
+    const match = clean.match(pattern);
+    if (match) return match[0].trim();
+  }
+  return "";
+}
+
 function subjectForScenario(scenario) {
   const subjects = {
     "ask-details": [
@@ -583,6 +618,11 @@ function subjectForScenario(scenario) {
       "Re: Updated budget for this collaboration",
       "Re: Improved budget and easier content scope",
       "Re: A better setup for the campaign",
+    ],
+    "rate-decline": [
+      "Re: Thanks for letting me know",
+      "Re: Keeping in touch for future opportunities",
+      "Re: Future collaboration",
     ],
     "contract-address": [
       "Next steps for our collaboration",
@@ -1065,6 +1105,48 @@ ${close}${notesSentence(context.notes)}
 ${signature(context)}`;
 }
 
+function generateRateDecline(context) {
+  const futureTiming = fieldValue("futureTiming") || extractFutureTiming(context.thread.creatorReply) || "when a better-fit opportunity comes up";
+  const opener = pickVariant("rate-decline-opener", [
+    "Thank you so much for getting back to me and for being clear about your rate.",
+    "Thanks for letting me know, and I completely understand.",
+    "I really appreciate your honest reply here.",
+  ]);
+  const budgetLine = pickVariant("rate-decline-budget", [
+    "For this specific round, I do not think we will be able to meet that number, but I completely respect you sticking to your usual rate.",
+    "For this campaign, the approved budget is still a bit below your rate, so I do not want to keep pushing you on a number that does not feel right on your side.",
+    "It sounds like this round may not be the right fit budget-wise, and that is totally understandable.",
+  ]);
+  const futureLine = pickVariant("rate-decline-future", [
+    `I would still love to keep the door open and check back ${futureTiming}.`,
+    `I will keep your profile in mind and would be happy to reconnect ${futureTiming}.`,
+    `If you are open to it, I can check back ${futureTiming} when we have a campaign that better matches your rate.`,
+  ]);
+  const brandLine = context.productName && context.productName !== "the product"
+    ? `We really like your content fit for ${context.productName}, so I would be happy to keep you in mind for future opportunities.`
+    : "We really like your content style, so I would be happy to keep you in mind for future opportunities.";
+  const close = pickVariant("rate-decline-close", [
+    "Thanks again for considering this one, and I hope we can find a better fit soon.",
+    "Thank you again, and I hope we can work together on a stronger-fit campaign in the future.",
+    "Really appreciate your time, and I will stay in touch for future opportunities.",
+  ]);
+
+  return `${greeting(context.name)}
+
+${opener}
+
+${budgetLine}
+
+${brandLine}
+
+${futureLine}
+${valueAddBullets(context)}
+
+${close}${notesSentence(context.notes)}
+
+${signature(context)}`;
+}
+
 function generateContractAddress(context) {
   const creativeRequirements = fieldValue("creativeRequirements");
   const requirementsBlock = creativeRequirements
@@ -1149,6 +1231,7 @@ function generateEmail() {
     "ask-budget": generateAskBudget,
     "negotiate-price": generateNegotiation,
     "sweetener-followup": generateSweetenerFollowup,
+    "rate-decline": generateRateDecline,
     "contract-address": generateContractAddress,
     "follow-up-draft": generateFollowUpDraft,
   };
