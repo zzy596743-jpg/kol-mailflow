@@ -7,7 +7,7 @@ KOL MailFlow is a lightweight browser tool for influencer operations teams. Past
 - Reads pasted email context, including forwarded Chinese/English email headers.
 - Extracts creator name, team signature, platform, quote, deliverables, and product.
 - Generates scenario-based English email drafts.
-- Can optionally polish the draft with OpenAI through a Vercel API route.
+- Can optionally polish the draft with DeepSeek through a Vercel API route.
 - Lets the user manually correct extracted fields before generating.
 - Keeps rule-based generation in the browser; AI polishing runs through the serverless API.
 
@@ -21,9 +21,9 @@ KOL MailFlow is a lightweight browser tool for influencer operations teams. Past
 
 ## Privacy
 
-Rule-based generation stays in the browser. If the user clicks `AI润色`, the pasted email context, current draft, extracted fields, notes, and memo are sent to the Vercel API route, which calls OpenAI. Do not paste sensitive personal data unless this is acceptable for your workflow.
+Rule-based generation stays in the browser. If the user clicks `AI润色`, the pasted email context, current draft, extracted fields, notes, and memo are sent to the Vercel API route, which calls DeepSeek. Do not paste sensitive personal data unless this is acceptable for your workflow.
 
-## OpenAI API Setup
+## DeepSeek API Setup
 
 The API key must be stored in Vercel, not in `app.js`.
 
@@ -34,13 +34,13 @@ In Vercel:
 3. Add:
 
 ```text
-OPENAI_API_KEY=your_api_key_here
+DEEPSEEK_API_KEY=your_api_key_here
 ```
 
 Optional model override:
 
 ```text
-OPENAI_MODEL=gpt-4.1
+DEEPSEEK_MODEL=deepseek-v4-flash
 ```
 
 After saving environment variables, redeploy the project. The `AI润色` button will call `/api/generate-email`.
