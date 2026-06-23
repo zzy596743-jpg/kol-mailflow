@@ -1188,7 +1188,7 @@ function generateContractAddress(context) {
 
 ${opener}
 
-I have attached our official contract template (Word document) to this email.
+I have attached our official contract template (PDF document) to this email.
 
 To move forward and lock everything in, please review the agreement and fill out the highlighted sections inside the document, including your Full Name, Shipping Address, and PayPal Account so we can get your product shipped out and your payment processed smoothly.
 
