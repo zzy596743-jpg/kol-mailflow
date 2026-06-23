@@ -10,6 +10,20 @@ function getOutputText(data) {
   return (data.choices?.[0]?.message?.content || "").trim();
 }
 
+function cleanEmailText(text) {
+  return text
+    .replace(/\*\*/g, "")
+    .replace(/```[a-z]*\n?/gi, "")
+    .replace(/```/g, "")
+    .replace(/[—–]/g, ", ")
+    .replace(/[ \t]+,/g, ",")
+    .replace(/,\s*,/g, ",")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -44,7 +58,8 @@ module.exports = async function handler(req, res) {
     "For negotiation or rejection, protect the relationship and make the creator feel respected.",
     "For contract next steps, clearly mention confirmed platform, package, and price if provided.",
     "Do not invent facts. If a detail is unclear, write around it safely.",
-    "Return only the email body. Do not include a subject line, markdown fence, or explanation."
+    "Return only the email body. Do not include a subject line, markdown fence, or explanation.",
+    "Use plain email text only. Do not use Markdown formatting, bold markers, headings, or long dashes."
   ].join("\n");
 
   const userPrompt = {
@@ -62,7 +77,8 @@ module.exports = async function handler(req, res) {
       "Avoid generic lines like 'just following up' unless there is a clear new value.",
       "Use short paragraphs. Use bullets only when terms need to be easy to forward.",
       "Do not over-apologize or sound desperate.",
-      "Do not add Chinese text to the final email."
+      "Do not add Chinese text to the final email.",
+      "Do not use **bold**, markdown headings, em dashes, or en dashes. Use normal commas or short sentences instead."
     ]
   };
 
@@ -90,7 +106,7 @@ module.exports = async function handler(req, res) {
       return;
     }
 
-    const email = getOutputText(data);
+    const email = cleanEmailText(getOutputText(data));
     if (!email) {
       sendJson(res, 500, { error: "DeepSeek returned an empty email." });
       return;
