@@ -177,6 +177,7 @@ const elements = {
   sampleBtn: document.querySelector("#sampleBtn"),
   clearBtn: document.querySelector("#clearBtn"),
   copyBtn: document.querySelector("#copyBtn"),
+  aiPolishBtn: document.querySelector("#aiPolishBtn"),
   memoBoard: document.querySelector("#memoBoard"),
   copyMemoBtn: document.querySelector("#copyMemoBtn"),
   statusText: document.querySelector("#statusText"),
@@ -1409,6 +1410,58 @@ async function copyOutput() {
   setStatus("已复制到剪贴板", "ok");
 }
 
+async function polishWithAI() {
+  if (elements.outputBox.classList.contains("empty") || !cleanText(elements.outputBox.innerText)) {
+    generateEmail();
+  }
+
+  const context = normalizeContext(buildContext());
+  const draft = elements.outputBox.innerText.trim();
+  if (!draft) {
+    setStatus("请先生成一版草稿", "warn");
+    return;
+  }
+
+  elements.aiPolishBtn.disabled = true;
+  elements.aiPolishBtn.textContent = "润色中...";
+  setStatus("AI 正在结合上下文重写邮件", "ok");
+
+  try {
+    const response = await fetch("/api/generate-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scenario: SCENARIOS[activeScenario]?.title || activeScenario,
+        rawEmail: cleanText(elements.rawEmail.value),
+        draft,
+        customNotes: cleanText(elements.customNotes.value),
+        memo: cleanText(elements.memoBoard.value),
+        extracted: {
+          creatorName: context.name,
+          senderName: context.senderName,
+          platform: context.platform,
+          quotedPrice: context.quotedPrice,
+          deliverables: context.deliverables,
+          productName: context.productName,
+          reasons: context.reasons,
+        },
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "AI 润色失败");
+
+    elements.outputBox.classList.remove("empty");
+    elements.outputBox.textContent = data.email.trim();
+    currentEmail = data.email.trim();
+    setStatus(`AI 已润色${data.model ? `（${data.model}）` : ""}`, "ok");
+  } catch (error) {
+    setStatus(error.message || "AI 润色失败，请稍后再试", "warn");
+  } finally {
+    elements.aiPolishBtn.disabled = false;
+    elements.aiPolishBtn.textContent = "AI润色";
+  }
+}
+
 async function copyMemo() {
   const text = cleanText(elements.memoBoard.value);
   if (!text) {
@@ -1468,6 +1521,7 @@ function bindEvents() {
   });
 
   elements.generateBtn.addEventListener("click", generateEmail);
+  elements.aiPolishBtn.addEventListener("click", polishWithAI);
   elements.outputBox.addEventListener("input", () => {
     if (!elements.outputBox.classList.contains("empty")) {
       setStatus("预览已手动修改，复制时会使用当前内容", "ok");

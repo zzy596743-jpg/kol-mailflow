@@ -7,8 +7,9 @@ KOL MailFlow is a lightweight browser tool for influencer operations teams. Past
 - Reads pasted email context, including forwarded Chinese/English email headers.
 - Extracts creator name, team signature, platform, quote, deliverables, and product.
 - Generates scenario-based English email drafts.
+- Can optionally polish the draft with OpenAI through a Vercel API route.
 - Lets the user manually correct extracted fields before generating.
-- Runs entirely in the browser as a static site.
+- Keeps rule-based generation in the browser; AI polishing runs through the serverless API.
 
 ## Scenarios
 
@@ -20,7 +21,29 @@ KOL MailFlow is a lightweight browser tool for influencer operations teams. Past
 
 ## Privacy
 
-This is a static front-end tool. The current version does not send pasted email content to any server or API.
+Rule-based generation stays in the browser. If the user clicks `AI润色`, the pasted email context, current draft, extracted fields, notes, and memo are sent to the Vercel API route, which calls OpenAI. Do not paste sensitive personal data unless this is acceptable for your workflow.
+
+## OpenAI API Setup
+
+The API key must be stored in Vercel, not in `app.js`.
+
+In Vercel:
+
+1. Open the project.
+2. Go to `Settings` -> `Environment Variables`.
+3. Add:
+
+```text
+OPENAI_API_KEY=your_api_key_here
+```
+
+Optional model override:
+
+```text
+OPENAI_MODEL=gpt-4.1
+```
+
+After saving environment variables, redeploy the project. The `AI润色` button will call `/api/generate-email`.
 
 ## Local Preview
 
@@ -35,6 +58,8 @@ Then open:
 ```text
 http://127.0.0.1:8766
 ```
+
+The local static preview cannot run the Vercel API route. Test `AI润色` on the deployed Vercel site, or run the project with Vercel CLI.
 
 ## Deploy to GitHub + Vercel
 

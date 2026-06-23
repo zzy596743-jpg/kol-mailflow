@@ -310,6 +310,22 @@ textarea:focus {
   margin-bottom: 14px;
 }
 
+.preview-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.ai-btn {
+  border-color: var(--accent-2);
+  color: var(--accent-2);
+}
+
+.ai-btn:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
 .copy-btn.copied {
   border-color: var(--ok);
   color: var(--ok);
