@@ -350,7 +350,7 @@ function extractPersonFromHeader(value) {
 }
 
 function isIflyAddress(value) {
-  return /@iflytalent\.(?:cn|world|work|org)\b/i.test(value) || /\biflytalent team\b/i.test(value);
+  return /@iflytalent\.(?:cn|world|work|org|net)\b/i.test(value) || /\biflytalent team\b/i.test(value);
 }
 
 function blockSender(block) {
@@ -584,6 +584,35 @@ function personalNoteLine(note) {
   return text;
 }
 
+function extractMoney(text) {
+  const clean = cleanText(text);
+  const match = clean.match(/(?:USD\s*)?[$€£]\s?\d[\d,]*(?:\.\d+)?|\b\d[\d,]*(?:\.\d+)?\s?(?:USD|EUR|GBP|dollars?)\b|\b\d[\d,]*(?:\.\d+)?\s?\$/i);
+  if (!match) return "";
+  const value = match[0].trim();
+  if (/\$$/.test(value)) return `$${value.replace(/\s?\$$/, "")}`;
+  return value;
+}
+
+function contractDealSummary(context) {
+  const noteText = context.notes;
+  const hasClientConfirmation = /客户.*(?:确认|确定|同意|通过|接受|批准)|brand.*(?:confirm|approve|accept)|client.*(?:confirm|approve|accept)/i.test(noteText);
+  const notePrice = extractMoney(noteText);
+  const price = notePrice || extractMoney(context.thread.ourText) || context.quotedPrice;
+  const instagramOnly = /(?:单个|单独|only|single|ig only|instagram only|ig平台|ins平台|instagram平台|ig\b|instagram\b)/i.test(noteText)
+    && !/(?:tiktok|两个|both|双平台)/i.test(noteText);
+  const tiktokOnly = /(?:tiktok only|single tiktok|单个tiktok|tiktok平台)/i.test(noteText)
+    && !/(?:instagram|ig|两个|both|双平台)/i.test(noteText);
+
+  let scope = "";
+  if (instagramOnly) scope = `the Instagram-only package (${DEFAULT_PLATFORM_PACKAGES.Instagram})`;
+  else if (tiktokOnly) scope = `the TikTok-only package (${DEFAULT_PLATFORM_PACKAGES.TikTok})`;
+  else if (context.deliverables) scope = deliverablePhrase(context);
+  else if (context.platform) scope = `${context.platform} content package`;
+
+  if (!hasClientConfirmation && !notePrice && !instagramOnly && !tiktokOnly) return null;
+  return { hasClientConfirmation, price, scope };
+}
+
 function extractFutureTiming(text) {
   const clean = cleanText(text);
   const patterns = [
@@ -807,9 +836,10 @@ function reasonSentence(reasons) {
   ]);
 }
 
-function translateCustomNotes(notes) {
+function translateCustomNotes(notes, options = {}) {
   const text = cleanText(notes);
   if (!text) return [];
+  const includeDealConfirmation = options.includeDealConfirmation !== false;
   const items = [];
   if (/排他|独家|exclusiv/i.test(text)) {
     items.push("Please also note that the client has an exclusivity requirement for this campaign.");
@@ -838,12 +868,21 @@ function translateCustomNotes(notes) {
       items.push(`For usage, this would include ${days} digital usage rights for ad purposes.`);
     }
   }
+  if (includeDealConfirmation && /客户.*(?:确认|确定|同意|通过|接受|批准)|brand.*(?:confirm|approve|accept)|client.*(?:confirm|approve|accept)/i.test(text)) {
+    const dealPrice = extractMoney(text);
+    const platform = /(?:单个|单独|only|single|ig only|instagram only|ig平台|ins平台|instagram平台|ig\b|instagram\b)/i.test(text)
+      ? "the Instagram-only package"
+      : /(?:tiktok only|single tiktok|单个tiktok|tiktok平台)/i.test(text)
+        ? "the TikTok-only package"
+        : "the confirmed package";
+    items.push(`The brand team has confirmed moving forward with ${platform}${dealPrice ? ` at ${dealPrice}` : ""}.`);
+  }
   if (!items.length && !hasChinese(text)) items.push(text);
   return uniqueValues(items);
 }
 
-function notesSentence(notes) {
-  const items = translateCustomNotes(notes);
+function notesSentence(notes, options = {}) {
+  const items = translateCustomNotes(notes, options);
   if (!items.length) return "";
   return `\n\n${items.join("\n")}`;
 }
@@ -1169,6 +1208,7 @@ ${signature(context)}`;
 
 function generateContractAddress(context) {
   const creativeRequirements = fieldValue("creativeRequirements");
+  const deal = contractDealSummary(context);
   const requirementsBlock = creativeRequirements
     ? hasRequirementIntro(creativeRequirements)
       ? `\n\n${creativeRequirements}`
@@ -1178,11 +1218,17 @@ function generateContractAddress(context) {
           `To make the prep easier, I am including the main ${context.productName} talking points below:`,
         ])}\n\n${creativeRequirements}`
     : "";
-  const opener = pickVariant("contract-opener", [
-    `Amazing, thank you for confirming. We are happy to move forward${context.deliverables ? ` with ${deliverablePhrase(context)}` : ""}.`,
-    `Perfect, thank you for confirming — excited to move this forward${context.deliverables ? ` with ${deliverablePhrase(context)}` : ""}.`,
-    `Great, thank you for sending this over. We can move ahead from here${context.deliverables ? ` with ${deliverablePhrase(context)}` : ""}.`,
-  ]);
+  const opener = deal
+    ? pickVariant("contract-confirmed-opener", [
+        `Great, thank you for the update. I just confirmed with the brand team, and they are happy to move forward${deal.scope ? ` with ${deal.scope}` : ""}${deal.price ? ` at ${deal.price}` : ""}.`,
+        `Perfect, I just checked with the brand team and we can move ahead${deal.scope ? ` with ${deal.scope}` : ""}${deal.price ? ` at ${deal.price}` : ""}.`,
+        `Wonderful, the brand team has confirmed that they would like to proceed${deal.scope ? ` with ${deal.scope}` : ""}${deal.price ? ` at ${deal.price}` : ""}.`,
+      ])
+    : pickVariant("contract-opener", [
+        `Amazing, thank you for confirming. We are happy to move forward${context.deliverables ? ` with ${deliverablePhrase(context)}` : ""}.`,
+        `Perfect, thank you for confirming — excited to move this forward${context.deliverables ? ` with ${deliverablePhrase(context)}` : ""}.`,
+        `Great, thank you for sending this over. We can move ahead from here${context.deliverables ? ` with ${deliverablePhrase(context)}` : ""}.`,
+      ]);
 
   return `${greeting(context.name)}
 
@@ -1206,7 +1252,7 @@ Whenever you have time, feel free to draft a quick video script/concept and send
 
 Once you return the signed agreement, we will get your products dispatched as soon as possible.
 
-Please let me know if you have any questions. Excited to work with you and looking forward to your script draft!${notesSentence(context.notes)}
+Please let me know if you have any questions. Excited to work with you and looking forward to your script draft!${notesSentence(context.notes, { includeDealConfirmation: false })}
 
 ${signature(context)}`;
 }
