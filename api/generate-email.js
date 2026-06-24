@@ -24,6 +24,15 @@ function cleanEmailText(text) {
     .trim();
 }
 
+function compactText(text, headLimit = 9000, tailLimit = 2500) {
+  const clean = String(text || "").trim();
+  if (clean.length <= headLimit + tailLimit) return clean;
+  const head = clean.slice(0, headLimit).trim();
+  if (!tailLimit) return `${head}\n\n[Older text omitted for speed]`;
+  const tail = clean.slice(-tailLimit).trim();
+  return `${head}\n\n[Older middle part omitted for speed]\n\n${tail}`;
+}
+
 module.exports = async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -48,10 +57,14 @@ module.exports = async function handler(req, res) {
 
   const body = typeof req.body === "string" ? JSON.parse(req.body || "{}") : req.body || {};
   const model = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
+  const rawEmailThread = compactText(body.rawEmail, 9000, 2200);
+  const currentDraft = compactText(body.draft, 3500, 0);
+  const memo = compactText(body.memo, 1600, 0);
+  const customNotes = compactText(body.customNotes, 1200, 0);
 
   const systemPrompt = [
     "You are a senior overseas influencer/KOL operations specialist writing English email replies.",
-    "Read the full email thread before rewriting. The reply must feel like it was written by a real influencer-operations person, not a template.",
+    "Read the email context before rewriting. The reply must feel like it was written by a real influencer-operations person, not a template.",
     "Use concrete context: names, sender signature, creator concerns, rates, platform, deliverables, product, usage rights, exclusivity, timing, previous budget changes, and previous compromises.",
     "If user notes are in Chinese, understand them and integrate them naturally in English; never paste Chinese into the email.",
     "Keep the tone warm, respectful, concise, and businesslike. Show empathy before asking for anything.",
@@ -65,11 +78,11 @@ module.exports = async function handler(req, res) {
   const userPrompt = {
     task: "Rewrite this influencer collaboration email so it feels contextual, warm, and human.",
     scenario: body.scenario || "",
-    rawEmailThread: body.rawEmail || "",
-    currentDraft: body.draft || "",
+    rawEmailThread,
+    currentDraft,
     extractedFields: body.extracted || {},
-    customNotes: body.customNotes || "",
-    memo: body.memo || "",
+    customNotes,
+    memo,
     styleRules: [
       "No Subject line.",
       "Keep the final sender signature from the draft if present.",
@@ -95,8 +108,8 @@ module.exports = async function handler(req, res) {
           { role: "system", content: systemPrompt },
           { role: "user", content: JSON.stringify(userPrompt, null, 2) }
         ],
-        max_tokens: 1200,
-        temperature: 0.7
+        max_tokens: 850,
+        temperature: 0.55
       })
     });
 
