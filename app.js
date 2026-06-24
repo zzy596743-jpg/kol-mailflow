@@ -31,6 +31,16 @@ const SCENARIOS = {
     reasons: ["项目预算有限", "预算需根据最终内容确认", "首次合作先试水", "客户还在比较红人报价", "未来有更多产品和合作机会"],
     defaultReasons: ["项目预算有限", "未来有更多产品和合作机会"],
   },
+  "client-review-pending": {
+    title: "等待客户审核",
+    desc: "红人给了报价后问进度，客户还没确认",
+    subject: "Re: Quick update on the collaboration",
+    fields: [
+      { id: "expectedTiming", label: "预计反馈时间", type: "text", placeholder: "例如 later this week / early next week，可留空" },
+    ],
+    reasons: ["已把报价提交客户", "客户还在内部审核", "一有消息马上回复", "我们会主动跟进客户"],
+    defaultReasons: ["已把报价提交客户", "客户还在内部审核", "一有消息马上回复"],
+  },
   "negotiate-price": {
     title: "砍价",
     desc: "客户有意向，但给价低于红人报价",
@@ -125,6 +135,10 @@ const REASON_TEXT = {
   "预算需根据最终内容确认": "the final budget will depend on the confirmed deliverables",
   "首次合作先试水": "since this would be our first collaboration, the client hopes to start with a trial budget",
   "客户还在比较红人报价": "the client is still reviewing creator options and rates",
+  "已把报价提交客户": "I have already shared your rate and details with the client",
+  "客户还在内部审核": "the client is still reviewing everything internally",
+  "一有消息马上回复": "I will come back to you as soon as I have any update",
+  "我们会主动跟进客户": "I will keep following up with the client on my side",
   "未来有更多产品和合作机会": "there may be more product launches and collaboration opportunities after this first round",
   "非常认可内容质量": "we really value the quality of your content",
   "希望降低合作门槛": "we want to keep the collaboration simple and easy to execute",
@@ -692,6 +706,11 @@ function subjectForScenario(scenario) {
       "Re: Package rate",
       "Re: Budget and deliverables",
     ],
+    "client-review-pending": [
+      "Re: Quick update on the collaboration",
+      "Re: Campaign status update",
+      "Re: Still checking with the client",
+    ],
     "negotiate-price": [
       "Re: Collaboration rate",
       "Re: Rate for this campaign",
@@ -1127,6 +1146,61 @@ ${close}${notesSentence(context.notes)}
 ${signature(context)}`;
 }
 
+function generateClientReviewPending(context) {
+  const expectedTiming = fieldValue("expectedTiming");
+  const rateLine = context.quotedPrice
+    ? pickVariant("review-pending-rate", [
+        `I have already shared your ${context.quotedPrice} rate and the campaign details with the client for review.`,
+        `I passed your ${context.quotedPrice} quote over to the client, along with the relevant profile and content details.`,
+        `Your ${context.quotedPrice} rate has already been sent to the client, so we are just waiting for their feedback now.`,
+      ])
+    : pickVariant("review-pending-no-rate", [
+        "I have already shared your details with the client for review.",
+        "I passed your information and the collaboration details over to the client.",
+        "Everything has been sent over to the client on my side, so we are waiting for their feedback now.",
+      ]);
+  const reviewLine = pickVariant("review-pending-status", [
+    "They are still reviewing the creator options internally, so I do not have a final confirmation just yet.",
+    "The brand team is still checking the creator list and budget internally, so I am waiting on their final direction.",
+    "The client has not finished their internal review yet, but I am keeping an eye on it closely.",
+    "We are still in the review stage with the client, so I do not want to give you a rushed or unclear answer.",
+  ]);
+  const timingLine = expectedTiming
+    ? pickVariant("review-pending-timing", [
+        `I expect to have a clearer update ${expectedTiming}, and I will let you know right away once I hear back.`,
+        `I should have more clarity ${expectedTiming}; once I do, I will come back to you immediately.`,
+        `I am hoping to hear more ${expectedTiming}, and I will keep you posted as soon as anything comes through.`,
+      ])
+    : pickVariant("review-pending-no-timing", [
+        "As soon as I hear back from them, I will update you right away.",
+        "Once I have any news from the client, I will come back to you immediately.",
+        "I will keep following up on my side and let you know the moment I have a concrete update.",
+      ]);
+  const opener = pickVariant("review-pending-opener", [
+    "Thank you for checking in.",
+    "Thanks so much for following up.",
+    "Thank you for the note, and I completely understand you wanting to check the status.",
+    "Thanks for reaching out, I know it is helpful to know where things stand.",
+  ]);
+  const close = pickVariant("review-pending-close", [
+    "Really appreciate your patience here.",
+    "Thank you again for your patience while we wait on the client side.",
+    "I appreciate you bearing with us while the client finishes their review.",
+  ]);
+
+  return `${greeting(context.name)}
+
+${opener}
+
+${rateLine} ${reviewLine}
+
+${timingLine}
+
+${close}${notesSentence(context.notes)}
+
+${signature(context)}`;
+}
+
 function generateNegotiation(context) {
   const target = fieldValue("targetPrice") || "[target price]";
   const bridge = contextBridgeLine(context, "negotiate-price");
@@ -1354,6 +1428,7 @@ function generateEmail() {
   const generators = {
     "ask-details": generateAskDetails,
     "ask-budget": generateAskBudget,
+    "client-review-pending": generateClientReviewPending,
     "negotiate-price": generateNegotiation,
     "sweetener-followup": generateSweetenerFollowup,
     "rate-decline": generateRateDecline,
